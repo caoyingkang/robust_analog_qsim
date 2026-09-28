@@ -329,10 +329,9 @@ def report(nb: int, noise: float = 0.1, t: float = 1.0,
 
 # ------------------------------------------------------------------ figure
 def make_figure(res: dict[str, Any], path: str, noise: float = 0.1) -> tuple[str, str]:
-    """Three panels:
+    """Two panels:
     (a) eps vs lamb, one curve per delta, with the fitted model overlaid;
-    (b) lamb_opt vs delta, with the fitted exponent;
-    (c) the collapse of the excess infidelity onto lamb*delta.
+    (b) lamb_opt vs delta, with the fitted exponent.
     """
     import matplotlib
     matplotlib.use("Agg")
@@ -344,8 +343,8 @@ def make_figure(res: dict[str, Any], path: str, noise: float = 0.1) -> tuple[str
     L = np.array(lambs, float)
     A, B, C = res["A"], res["B"], res["C"]
 
-    fig, axs = plt.subplots(1, 3, figsize=(13.2, 3.9))
-    fig.subplots_adjust(wspace=0.30, left=0.06, right=0.985, bottom=0.155, top=0.9)
+    fig, axs = plt.subplots(1, 2, figsize=(8.8, 3.9))
+    fig.subplots_adjust(wspace=0.30, left=0.09, right=0.985, bottom=0.155, top=0.9)
 
     cmap = plt.get_cmap("viridis")
     colors = {d: cmap(i / max(len(fin) - 1, 1)) for i, d in enumerate(fin)}
@@ -397,24 +396,6 @@ def make_figure(res: dict[str, Any], path: str, noise: float = 0.1) -> tuple[str
     ax.set_ylabel(r"$\lambda_{\rm opt}$")
     ax.set_title(r"(b) optimal penalty strength", fontsize=10)
     ax.legend(fontsize=7.5, loc="upper right", framealpha=0.95)
-    ax.grid(alpha=0.2, which="both", lw=0.4)
-
-    # ---------------- panel (c): the lamb*delta collapse ----------------
-    ax = axs[2]
-    for d in fin:
-        ex, _ = excess_per_seed(G, "infidelity", d, lambs, seeds)
-        keep = (ex > 0) & (ex < 0.45) & (B * d * d * L * L >= 10 * abs(C) * d)
-        lab = rf"$\delta = 10^{{{int(round(np.log10(d)))}}}$"
-        ax.plot(L[keep] * d, ex[keep], marker="o", ms=4, lw=1.1,
-                color=colors[d], label=lab, zorder=3)
-    xs = np.logspace(-3.4, np.log10(0.5), 40)
-    ax.plot(xs, B * xs ** 2, ls="--", lw=1.4, color="r", alpha=0.85, zorder=2,
-            label=rf"$B(\lambda\delta)^2$, $B={B:.2f}$")
-    ax.set_xscale("log"); ax.set_yscale("log")
-    ax.set_xlabel(r"$\lambda\delta$")
-    ax.set_ylabel(r"excess infidelity $\epsilon(\lambda,\delta)-\epsilon(\lambda,0)$")
-    ax.set_title(r"(c) collapse onto $\lambda\delta$", fontsize=10)
-    ax.legend(fontsize=7.5, loc="upper left", framealpha=0.95)
     ax.grid(alpha=0.2, which="both", lw=0.4)
 
     fig.savefig(path, bbox_inches="tight", dpi=200)
