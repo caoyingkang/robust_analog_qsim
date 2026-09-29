@@ -5,13 +5,21 @@ Fits and figure for the penalty-miscalibration sweeps produced by
 The evolution time t is FIXED (t = 1) for every data point in this study, so it
 is not a variable and is absorbed into the fitted constants throughout:
 
-    eps(lamb, delta)  =  A/lamb  +  B delta^2 lamb^2  (+ C delta)
+    eps(lamb, delta)  =  A/lamb  +  B delta^2 lamb^2
 
-A, B and C are therefore t-dependent constants evaluated at t = 1.  Writing an
+A and B are therefore t-dependent constants evaluated at t = 1.  Writing an
 explicit t^2 on the second term only would wrongly suggest the first term is
 t-independent: the paper's own bound, Eq. (16), is (M^2/lamb)(6 + 13 M t),
 i.e. A grows with t.  Neither t-scaling is tested here.  `plot_miscal.ipynb` is the narrative driver for this module
 and explains what every quantity means.
+
+There is deliberately no term linear in delta.  The Hamiltonian depends on
+delta only through delta * u_a, and u_a ~ U[-1, 1] is symmetric and independent
+of the noise and the initial state, so the ensemble-averaged eps is even in
+delta.  Each seed does have a linear term, of random sign.  Because
+`simulate.py` reuses one u pattern per seed for every delta, the mean of those
+slopes over a finite set of seeds shows up as the same offset at every delta;
+that offset is sampling noise, and `linear_floor` measures its size.
 
 Parsing is field-order-agnostic on purpose: the positional `.replace()` chain in
 `data/plot_sweep_lamb.ipynb` breaks as soon as the `miscal` field is added.
@@ -122,23 +130,16 @@ def excess_per_seed(G: Grid, metric: str, delta: float, lambs: Sequence[int],
 
 
 def fit_excess(G: Grid, metric: str, deltas: Sequence[float], lambs: Sequence[int],
-               seeds: Sequence[int], with_C: bool = True,
-               max_excess: float = 0.3, nb: int = 2) -> tuple[float, float, int]:
-    """Fit the EXCESS  eps(lamb,delta) - eps(lamb,0) = B delta^2 lamb^2 + C delta.
+               seeds: Sequence[int], max_excess: float = 0.3, nb: int = 2
+               ) -> tuple[float, int]:
+    """Fit the EXCESS  eps(lamb,delta) - eps(lamb,0) = B delta^2 lamb^2.
 
-    t is fixed at 1 throughout and is absorbed into B and C (see module docstring).
+    t is fixed at 1 throughout and is absorbed into B (see module docstring).
 
-    Fitting the excess rather than eps itself is what makes both parameters
-    identifiable:
-
-      * it needs no model of the delta = 0 baseline, so the whole lamb range is
-        usable -- including small lamb, which is the ONLY place the C delta
-        floor is separable from B delta^2 lamb^2.  Restricting to lamb >= 32 (as
-        a fit to eps must, since the A/lamb law itself drifts below that)
-        leaves C unconstrained and the fit then absorbs unrelated residual
-        structure into it, returning the wrong sign.
-      * the measured eps(lamb,0) is used exactly instead of the A/lamb
-        approximation.
+    Fitting the excess rather than eps itself needs no model of the delta = 0
+    baseline, so the whole lamb range is usable (a fit to eps would have to
+    stop at lamb >= 32, below which the A/lamb law itself drifts), and the
+    measured eps(lamb,0) is used exactly instead of the A/lamb approximation.
 
     Saturated points (excess > max_excess) are dropped: the model is the
     small-rotation limit, not the saturated one.
@@ -154,62 +155,25 @@ def fit_excess(G: Grid, metric: str, deltas: Sequence[float], lambs: Sequence[in
             L.append(l); D.append(d); Y.append(ex[i]); W.append(1.0 / max(sem[i], 1e-14))
     L, D, Y, W = map(np.asarray, (L, D, Y, W))
 
-    def model(p):
-        out = p[0] * D ** 2 * L ** 2
-        return out + p[1] * D if with_C else out
-
-    p0 = [B_ANALYTIC(nb) * 0.6] + ([-0.2] if with_C else [])
-    res = opt.least_squares(lambda p: W * (model(p) - Y), p0)
-    B = float(res.x[0]); C = float(res.x[1]) if with_C else 0.0
-    return B, C, len(Y)
+    res = opt.least_squares(lambda p: W * (p[0] * D ** 2 * L ** 2 - Y),
+                            [B_ANALYTIC(nb) * 0.6])
+    return float(res.x[0]), len(Y)
 
 
-def fit_B_on_eps(G: Grid, metric: str, deltas: Sequence[float], lambs: Sequence[int],
-                 seeds: Sequence[int], A: float, with_C: bool = True,
-                 lamb_min: int = 32, nb: int = 2) -> tuple[float, float, int]:
-    """The naive form: fit eps = A/lamb + B d^2 l^2
-    (+ C d) with A fixed, over lamb >= lamb_min.  Kept for comparison -- see
-    `fit_excess` for why C is not identifiable this way."""
-    L, D, Y, W = [], [], [], []
-    for d in deltas:
-        if d == 0:
-            continue
-        mean, _, sem = agg(G, metric, d, lambs, seeds)
-        for i, l in enumerate(lambs):
-            if l < lamb_min or mean[i] > 0.5:
-                continue
-            L.append(l); D.append(d); Y.append(mean[i]); W.append(1.0 / max(sem[i], 1e-12))
-    L, D, Y, W = map(np.asarray, (L, D, Y, W))
+def linear_floor(G: Grid, metric: str, deltas: Sequence[float], lambs: Sequence[int],
+                 seeds: Sequence[int], small_lamb: Sequence[int] = (1, 2, 4, 8)
+                 ) -> tuple[float, list[int], FloatArray, FloatArray]:
+    """Seed-averaged slope excess/delta at small lamb: (delta, lambs, mean, SEM).
 
-    def model(p):
-        out = A / L + p[0] * D ** 2 * L ** 2
-        return out + p[1] * D if with_C else out
-
-    p0 = [B_ANALYTIC(nb) * 0.6] + ([-0.2] if with_C else [])
-    res = opt.least_squares(lambda p: W * (model(p) - Y), p0)
-    return float(res.x[0]), (float(res.x[1]) if with_C else 0.0), len(Y)
-
-
-def measure_C(G: Grid, metric: str, deltas: Sequence[float], lambs: Sequence[int],
-              seeds: Sequence[int], B: float,
-              small_lamb: Sequence[int] = (1, 2, 4, 8), C_scale: float = 0.2,
-              frac: float = 0.1) -> tuple[float, float, float, int]:
-    """C read directly off the small-lamb wing, where B d^2 l^2 << |C| d.
-
-    `C_scale` is the order of magnitude of |C| used only to SCREEN which cells
-    qualify (the B term must be < `frac` of the floor there); the returned value
-    is measured, not assumed.  Small-lamb cells only, since that is the sole
-    region where the floor is separable from B d^2 l^2."""
-    vals: list[float] = []
-    for d in deltas:
-        if d == 0:
-            continue
-        ex, _ = excess_per_seed(G, metric, d, lambs, seeds)
-        for i, l in enumerate(lambs):
-            if l in small_lamb and B * d * d * l * l < frac * C_scale * d:
-                vals.append(ex[i] / d)
-    return (float(np.median(vals)), float(np.min(vals)), float(np.max(vals)),
-            len(vals)) if vals else (np.nan,) * 3 + (0,)
+    Taken at the smallest nonzero delta, where B delta^2 lamb^2 is negligible,
+    so excess/delta is the linear term alone.  Its ensemble average is zero
+    (module docstring); the SEM is the size of the offset that survives the
+    average over a finite set of seeds.
+    """
+    d = min(x for x in deltas if x > 0)
+    ls = [l for l in lambs if l in small_lamb]
+    ex, sem = excess_per_seed(G, metric, d, ls, seeds)
+    return d, ls, ex / d, sem / d
 
 
 def lambda_opt(mean: FloatArray, lambs: Sequence[int]) -> tuple[float, bool]:
@@ -260,27 +224,20 @@ def report(nb: int, noise: float = 0.1, t: float = 1.0,
     out.update(A=A, eps0=m0, eps0_std=s0)
 
     # --- 2/3. global fit for B, and kappa ------------------------------
-    B, C, npts = fit_excess(G, "infidelity", deltas, lambs, seeds,
-                            with_C=True, nb=nb)
-    B_noC, _, _ = fit_excess(G, "infidelity", deltas, lambs, seeds,
-                             with_C=False, nb=nb)
-    Cm, Clo, Chi, nC = measure_C(G, "infidelity", deltas, lambs, seeds, B)
-    Be, Ce, ne = fit_B_on_eps(G, "infidelity", deltas, lambs, seeds, A,
-                              with_C=True, nb=nb)
-    print(f"\n2. Global fit of the EXCESS  eps(l,d) - eps(l,0) = B d^2 l^2 + C d")
+    B, npts = fit_excess(G, "infidelity", deltas, lambs, seeds, nb=nb)
+    d_lin, l_lin, slope, slope_sem = linear_floor(G, "infidelity", deltas, lambs, seeds)
+    floor = float(np.max(slope_sem))
+    print(f"\n2. Global fit of the EXCESS  eps(l,d) - eps(l,0) = B d^2 l^2")
     print(f"   ({npts} points, paired per seed, weighted by the SEM of the difference)")
-    print(f"   B = {B:.3f}    C = {C:+.4f}")
-    print(f"   B = {B_noC:.3f}  with the C term omitted")
-    print(f"   C measured directly off the small-lamb wing: {Cm:+.4f} "
-          f"(range {Clo:+.4f}..{Chi:+.4f}, n={nC})  -> consistent")
-    print(f"   [the naive alternative -- fit eps itself over lamb >= 32 with A")
-    print(f"    fixed -- gives B = {Be:.3f}, C = {Ce:+.4f} ({ne} pts): C comes out with")
-    print(f"    the WRONG SIGN, because above lamb = 32 the B term dominates and C is")
-    print(f"    unidentifiable.  Use the excess fit; see fit_excess docstring.]")
+    print(f"   B = {B:.3f}")
+    print(f"   No linear term: <eps> is even in delta (u -> -u symmetry).  Seed-averaged")
+    print(f"   slope excess/delta at delta = {d_lin:.0e}, which is sampling noise only:")
+    for l, m, e in zip(l_lin, slope, slope_sem):
+        print(f"     lamb = {l:>2d}   {m:+.4f} +- {e:.4f}   ({m / e:+.1f} SEM)")
     print(f"\n3. B against the analytic form B = kappa * (20/3) * nb")
     print(f"   B_analytic = kappa * (20/3) * nb = kappa * {B_ANALYTIC(nb):.3f}")
     print(f"   => kappa = {B / B_ANALYTIC(nb):.3f}   (expected O(1), <~ 1)")
-    out.update(B=B, C=C, B_noC=B_noC, kappa=B / B_ANALYTIC(nb))
+    out.update(B=B, kappa=B / B_ANALYTIC(nb))
 
     # --- 4. lambda_opt and its exponent --------------------------------
     print(f"\n4. lambda_opt by parabolic fit of log eps vs log lamb")
@@ -301,27 +258,24 @@ def report(nb: int, noise: float = 0.1, t: float = 1.0,
 
     # --- 5. collapse onto lamb*delta -----------------------------------
     print(f"\n5. Collapse onto lamb*delta: K = [eps(lamb,delta) - eps(lamb,0)] / (lamb*delta)^2")
-    print(f"   window: lamb*delta <= 0.03 (perturbative) AND "
-          f"B d^2 l^2 >= 10|C|d (C floor < 10%)")
-    print(f"   {'delta':>9s} {'lamb window':>14s} {'K':>8s} {'K - C*d term':>13s}")
+    print(f"   window: lamb*delta <= 0.03 (perturbative) AND B d^2 l^2 >= 10 s d,")
+    print(f"   s = {floor:.4f} = largest SEM of the slope in 2. (sampling offset < 10%)")
+    print(f"   {'delta':>9s} {'lamb window':>14s} {'K':>8s}")
     Ks: list[float] = []
-    Kc: list[float] = []
     for d in fin:
         mr, _, _ = agg(G, "infidelity", d, lambs, seeds)
         keep = [i for i, l in enumerate(lambs)
-                if l * d <= 0.03 and B * d * d * l * l >= 10 * abs(C) * d]
+                if l * d <= 0.03 and B * d * d * l * l >= 10 * floor * d]
         if not keep:
             print(f"   {d:>9.0e} {'(empty)':>14s}"); continue
         k = [(mr[i] - m0[i]) / (lambs[i] * d) ** 2 for i in keep]
-        kc = [(mr[i] - m0[i] - C * d) / (lambs[i] * d) ** 2 for i in keep]
-        Ks.append(np.mean(k)); Kc.append(np.mean(kc))
+        Ks.append(np.mean(k))
         print(f"   {d:>9.0e} {f'{lambs[keep[0]]}-{lambs[keep[-1]]}':>14s} "
-              f"{np.mean(k):>8.3f} {np.mean(kc):>13.3f}")
+              f"{np.mean(k):>8.3f}")
     if len(Ks) > 1:
-        print(f"   spread across delta: {max(Ks)/min(Ks):.3f}x  ->  "
-              f"{max(Kc)/min(Kc):.3f}x after removing C*delta")
-        print(f"   K = {np.mean(Kc):.3f}  => kappa = {np.mean(Kc)/B_ANALYTIC(nb):.3f}")
-        out.update(K=float(np.mean(Kc)), K_spread=max(Kc) / min(Kc))
+        print(f"   spread across delta: {max(Ks)/min(Ks):.3f}x")
+        print(f"   K = {np.mean(Ks):.3f}  => kappa = {np.mean(Ks)/B_ANALYTIC(nb):.3f}")
+        out.update(K=float(np.mean(Ks)), K_spread=max(Ks) / min(Ks))
     out["G"] = G
     print()
     return out
@@ -341,7 +295,7 @@ def make_figure(res: dict[str, Any], path: str, noise: float = 0.1) -> tuple[str
     deltas, lambs, seeds = res["deltas"], res["lambs"], res["seeds"]
     fin = [d for d in deltas if d > 0]
     L = np.array(lambs, float)
-    A, B, C = res["A"], res["B"], res["C"]
+    A, B = res["A"], res["B"]
 
     fig, axs = plt.subplots(1, 2, figsize=(8.8, 3.9))
     fig.subplots_adjust(wspace=0.30, left=0.09, right=0.985, bottom=0.155, top=0.9)
@@ -360,14 +314,14 @@ def make_figure(res: dict[str, Any], path: str, noise: float = 0.1) -> tuple[str
         if d > 0:
             # the model is the small-rotation limit: only draw it where it is
             # valid, else B d^2 lamb^2 runs to 1e4 and squashes the data.
-            fitc = A / L + B * d ** 2 * L ** 2 + C * d
-            ok = (fitc > 0) & (fitc < 1.0)
+            fitc = A / L + B * d ** 2 * L ** 2
+            ok = fitc < 1.0
             ax.plot(L[ok], fitc[ok], ls="--", lw=1.0, color=colors[d],
                     alpha=0.85, zorder=2)
     ax.plot(L, A / L, ls=":", lw=1.2, color="k", alpha=0.7, zorder=2,
             label=rf"$A/\lambda$, $A={A:.2f}$")
     for d, lo in zip(fin, res["lo_raw"]):
-        ymin = A / lo + B * d ** 2 * lo ** 2 + C * d
+        ymin = A / lo + B * d ** 2 * lo ** 2
         ax.plot([lo], [ymin], marker="v", ms=6, color=colors[d],
                 mec="k", mew=0.5, zorder=5)
         ax.plot([lo, lo], [ymin * 0.3, ymin * 0.75], color=colors[d],
