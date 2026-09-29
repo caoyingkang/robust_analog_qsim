@@ -17,7 +17,7 @@ Parsing is field-order-agnostic on purpose: the positional `.replace()` chain in
 `data/plot_sweep_lamb.ipynb` breaks as soon as the `miscal` field is added.
 
 Run:  .env/bin/python Hpen_miscal/analysis.py --nb 2
-      .env/bin/python Hpen_miscal/analysis.py --nb 2 --figure Hpen_miscal/fig_miscal.pdf
+      .env/bin/python Hpen_miscal/analysis.py --nb 2 --figure Hpen_miscal/fig_miscal_2blocks.pdf
 """
 
 import argparse
@@ -411,7 +411,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--noise", type=float, default=0.1)
     ap.add_argument("--t", type=float, default=1.0)
     ap.add_argument("--datadir", default=None)
-    ap.add_argument("--figure", default=None, help="output path, e.g. data/fig_miscal.pdf")
+    ap.add_argument("--figure", default=None, help="output path, e.g. data/fig_miscal_2blocks.pdf")
     args = ap.parse_args(argv)
     res = report(args.nb, args.noise, args.t, args.datadir)
     if args.figure:
