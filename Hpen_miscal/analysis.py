@@ -331,7 +331,9 @@ def make_figure(res: dict[str, Any], path: str, noise: float = 0.1) -> tuple[str
     ax.set_xlabel(r"penalty coefficient $\lambda$")
     ax.set_ylabel(r"infidelity $\epsilon$")
     ax.set_title(rf"(a) $n_b={nb}$, $t={t:g}$, 1-local noise ${noise:g}$", fontsize=10)
-    ax.legend(fontsize=7, ncol=2, loc="lower left", framealpha=0.95)
+    ax.legend(fontsize=ax.xaxis.label.get_size(), ncol=2, loc="lower left", framealpha=0.95,
+              handlelength=1.5, handletextpad=0.4, columnspacing=0.8, labelspacing=0.3,
+              borderaxespad=0.3)
     ax.grid(alpha=0.2, which="both", lw=0.4)
 
     # ---------------- panel (b): lambda_opt vs delta ----------------
@@ -349,7 +351,7 @@ def make_figure(res: dict[str, Any], path: str, noise: float = 0.1) -> tuple[str
     ax.set_xlabel(r"relative miscalibration $\delta$")
     ax.set_ylabel(r"$\lambda_{\rm opt}$")
     ax.set_title(r"(b) optimal penalty strength", fontsize=10)
-    ax.legend(fontsize=7.5, loc="upper right", framealpha=0.95)
+    ax.legend(fontsize=ax.xaxis.label.get_size(), loc="upper right", framealpha=0.95)
     ax.grid(alpha=0.2, which="both", lw=0.4)
 
     fig.savefig(path, bbox_inches="tight", dpi=200)
