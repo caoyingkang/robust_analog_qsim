@@ -1,5 +1,6 @@
 # Robust analog quantum simulators by quantum error-detecting codes
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23303050.svg)](https://doi.org/10.5281/zenodo.23303050)
 
 ## Overview
 
