@@ -1,0 +1,47 @@
+cff-version: 1.2.0
+message: "If you use this code or data, please cite the accompanying paper."
+title: "Robust analog quantum simulators by quantum error-detecting codes: code and data"
+type: software
+authors:
+  - family-names: Cao
+    given-names: Yingkang
+  - family-names: Liu
+    given-names: Suying
+  - family-names: Deng
+    given-names: Haowei
+  - family-names: Xia
+    given-names: Zihan
+  - family-names: Wu
+    given-names: Xiaodi
+  - family-names: Wang
+    given-names: Yu-Xin
+license: MIT
+repository-code: "https://github.com/caoyingkang/robust_analog_qsim"
+keywords:
+  - analog quantum simulation
+  - Hamiltonian simulation
+  - quantum error-detecting codes
+  - quantum error suppression
+  - energy-gap protection
+preferred-citation:
+  type: article
+  title: "Robust analog quantum simulators by quantum error-detecting codes"
+  authors:
+    - family-names: Cao
+      given-names: Yingkang
+    - family-names: Liu
+      given-names: Suying
+    - family-names: Deng
+      given-names: Haowei
+    - family-names: Xia
+      given-names: Zihan
+    - family-names: Wu
+      given-names: Xiaodi
+    - family-names: Wang
+      given-names: Yu-Xin
+  year: 2024
+  doi: "10.48550/arXiv.2412.07764"
+  url: "https://arxiv.org/abs/2412.07764"
+  identifiers:
+    - type: other
+      value: "arXiv:2412.07764"

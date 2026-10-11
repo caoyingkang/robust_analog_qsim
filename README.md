@@ -10,6 +10,7 @@ This repository provides code for numerical simulation of the robust analog quan
 - `numpy`
 - `scipy`
 - `matplotlib`
+- `pandas`
 - The scripts in `src/` rely on the Python package `dynamite` for fast simulation of many-body quantum spin dynamics. To install `dynamite`, please follow the instructions in [https://github.com/GregDMeyer/dynamite](https://github.com/GregDMeyer/dynamite).
 - The scripts in `Hpen_miscal/` do not need `dynamite`; they use `qutip` (version 5) and `scipy` instead.
 
